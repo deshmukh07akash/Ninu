@@ -154,27 +154,16 @@ function getConfessionOverlayMedia() {
 }
 
 function getConfessionOverlayPositions(count) {
-  const leftPositions = [
-    { top: '16%', left: '4%' },
-    { top: '34%', left: '3%' },
-    { top: '55%', left: '5%' },
-    { top: '75%', left: '4%' },
-    { top: '88%', left: '10%' },
-  ];
-  const rightPositions = [
-    { top: '17%', right: '4%' },
-    { top: '36%', right: '3%' },
-    { top: '56%', right: '5%' },
-    { top: '76%', right: '4%' },
-    { top: '88%', right: '10%' },
-  ];
   const positions = [];
-  const leftPool = shuffleMedia(leftPositions);
-  const rightPool = shuffleMedia(rightPositions);
+  const rowsPerSide = Math.ceil(count / 2);
 
   for (let i = 0; i < count; i++) {
-    const pool = i % 2 === 0 ? leftPool : rightPool;
-    positions.push(pool[Math.floor(i / 2) % pool.length]);
+    const row = Math.floor(i / 2);
+    const top = rowsPerSide > 1 ? 8 + (row * 84) / (rowsPerSide - 1) : 50;
+    const sideOffset = Math.random() * 3;
+    positions.push(i % 2 === 0
+      ? { top: `${top}%`, left: `${4 + sideOffset}%` }
+      : { top: `${top}%`, right: `${4 + sideOffset}%` });
   }
 
   return positions;
@@ -524,7 +513,9 @@ function generateConfessionFilmStrip() {
   if (!track) return;
 
   track.innerHTML = '';
-  const confessionMedia = getConfessionMediaSequence();
+  // Keep only a small set of frames so the hidden film strip does not decode
+  // dozens of videos while the page is idle.
+  const confessionMedia = getConfessionMediaSequence().slice(0, 6);
   const loopImages = [...confessionMedia, ...confessionMedia];
 
   loopImages.forEach((media, index) => {
@@ -532,7 +523,7 @@ function generateConfessionFilmStrip() {
     frame.className = 'film-frame';
 
     const mediaEl = createMediaElement(media, '', '', {
-      autoplay: true,
+      autoplay: false,
       muted: true,
       playbackRate: 1.5,
     });
@@ -548,12 +539,14 @@ function startConfessionFilmStrip() {
   const strip = document.getElementById('confession-film-strip');
   if (!strip) return;
   strip.classList.add('is-running');
+  strip.querySelectorAll('video').forEach(video => video.play().catch(() => {}));
 }
 
 function stopConfessionFilmStrip() {
   const strip = document.getElementById('confession-film-strip');
   if (!strip) return;
   strip.classList.remove('is-running');
+  strip.querySelectorAll('video').forEach(video => video.pause());
 }
 
 // ====== PHOTO OVERLAY (floating photos around video) ======
@@ -567,8 +560,8 @@ function startPhotoOverlay() {
   photoOverlayActive = true;
   overlay.innerHTML = '';
 
-  const confessionMedia = getConfessionOverlayMedia();
-  // Add every memory as repeating groups: 2 videos, then 1 image.
+  // A few active videos keep the decorative overlay smooth on mobile devices.
+  const confessionMedia = getConfessionOverlayMedia().slice(0, 6);
   const positions = getConfessionOverlayPositions(confessionMedia.length);
 
   positions.forEach((pos, i) => {
@@ -648,6 +641,7 @@ function stopPhotoOverlay() {
   }
 
   // Fade out and remove children after animation
+  overlay.querySelectorAll('video').forEach(video => video.pause());
   overlay.style.opacity = '0';
   setTimeout(() => {
     overlay.innerHTML = '';
